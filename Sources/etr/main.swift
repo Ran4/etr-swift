@@ -150,11 +150,10 @@ let finalStack = run(stack: stack, items: items)
 // print("STACK: \(stack)\nITEM: \(item)\n")
 
 
-
-
 let rawEtcLines: String = """
-    Key - void - Any - dict
-    Dict - void - dict - dict
+    key - dict - Any - dict
+    key - void - Any - dict
+    dict - void - dict - dict
     as - void - Any - namebinder
     namebinder - void - key - bound
     both - void - list - bound

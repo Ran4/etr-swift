@@ -1,0 +1,31 @@
+; vim: ft=abnf
+
+sep = SP "-" SP
+identifier = 1*ALPHA
+current-stack-value = identifier
+previous-stack-values = identifier *(SP identifier)
+new-item = identifier
+output-item = identifier
+etr-definition = current-stack-value ":" LF
+                 *(1*WSP ("void" / previous-stack-values) sep new-item sep output-item LF)
+etr-definitions = *etr-definition
+
+
+; Examples:
+;    key:
+;        dict - Any - dict
+;        void - Any - dict
+;    dict:
+;        void - dict - dict
+;    as:
+;        void - Any - name-binder
+;    name:
+;        binder - void - key - bound
+;    both:
+;        void - list - bound
+;    and:
+;        void - key - list
+;    ,:
+;        key - key - void
+;    ,:
+;        l
