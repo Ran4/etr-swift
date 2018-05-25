@@ -162,6 +162,27 @@ let rawEtcLines: String = """
     , - list - key - void
     """
     
+/// TODO: implement using [ETR definitions](etr_abnf_definitions.abnf)
+let rawEtcLines2: String = """
+key:
+    dict - Any - dict
+    void - Any - dict
+dict:
+    void - dict - dict
+as:
+    void - Any - name-binder
+name:
+    binder - void - key - bound
+both:
+    void - list - bound
+and:
+    void - key - list
+,:
+    key - key - void
+,:
+    list - key - void
+"""
+    
 var etss = Ets.from(rawLines: rawEtcLines)
 var etsDict = [String: Ets]()
 for ets in etss {
