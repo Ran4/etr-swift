@@ -56,14 +56,28 @@ struct Ets {
 indirect enum Item: CustomStringConvertible {
     case Key(String)
     case ItemDict(dict: Dictionary<String, Item>)
+    case List([Item])
     case ItemInt(Int)
     case ItemString(String)
+    case As
+    case Both
+    case And
+    case NameBinder(Item)
+    case Bound(String, Item)
     
     static func from(_ inputValue: String) -> Item? {
         if inputValue.hasPrefix(":") {
             return .Key(inputValue)
         } else {
-            return .ItemString(inputValue)
+            if inputValue == "as" {
+                return .As
+            } else if inputValue == "both" {
+                return .Both
+            } else if inputValue == "and" {
+                return .And
+            } else {
+                return .ItemString(inputValue)
+            }
         }
     }
     
@@ -77,7 +91,15 @@ indirect enum Item: CustomStringConvertible {
                     dictRepresentations.append("\(key) \(value)")
                 }
                 return "(dict \(dictRepresentations.joined(separator: " ")))"
+            case let .List(items):
+                let itemDescriptions = items.map {item in item.description }.joined(separator: " ")
+                return "(list \(itemDescriptions))"
             case let .ItemString(s): return "\"" + s + "\""
+            case .As: return "(as)"
+            case .Both: return "(both)"
+            case .And: return "(and)"
+            case let .NameBinder(item): return "(namebinder \(item))"
+            case let .Bound(key, item): return "(bound \(key) \(item))"
         }
     }
 }
@@ -85,10 +107,38 @@ indirect enum Item: CustomStringConvertible {
 typealias Stack = [Item]
     
 func iterate(stack: Stack, item: Item) -> Stack {
-    print("it. \(item)")
+    print("EVAL [ \(stack.map{$0.description}.joined(separator: " ")) ] \(item)")
+    switch item {
+    case .As:
+        if let itemFromStack = stack.last {
+            return stack.dropLast() + [.NameBinder(itemFromStack)]
+        } else {
+            print("WANING: 'As' statement with empty stack. Does nothing.")
+        }
+    case .Both:
+        return stack + [.Both]
+    case .And:
+        return stack + [.And]
+    case _:
+        break
+    // case 
+    }
     
     if let currentStackItem = stack.last {
         switch currentStackItem {
+        case .And:
+            if case let prevItem? = stack.dropLast().last {
+                return iterate(stack: Array(stack.dropLast(2)), item: .List([prevItem, item]))
+            } else {
+                print("WANING: 'And' statement with empty stack. Does nothing.")
+            }
+        case .Both:
+            if case .List = item { // fall-through
+                print("'Both' got list, falling through")
+                return iterate(stack: Array(stack.dropLast()), item: item)
+            } else {
+                break
+            }
         case let .Key(s):
             if case let .ItemDict(oldDict)? = stack.dropLast().last {
                 // dict - Any - dict
@@ -105,11 +155,30 @@ func iterate(stack: Stack, item: Item) -> Stack {
         case let .ItemDict(d1):
             switch item {
             case let .ItemDict(d2):
+                // void - dict - dict
                 print("dict eats dict -> update with new dict")
                 let newDict = d1.merging(d2, uniquingKeysWith: { (v1, v2) in v2 })
                 let newItem = Item.ItemDict(dict: newDict)
                 return stack.dropLast() + [newItem]
             case _:
+                break
+            }
+        case .As:
+            return stack.dropLast() + [.NameBinder(item)]
+        case let .NameBinder(itemToBind):
+            switch item {
+            case let .Key(s):
+                return stack.dropLast() + [.Bound(s, itemToBind)]
+            case let .List(itemKeys):
+                //TODO: fix this
+                print("cool, got list of itemKeys \(itemKeys)")
+                var newStack: [Item] = Array(stack)
+                for itemKey in itemKeys {
+                    newStack = iterate(stack: newStack + [.NameBinder(itemToBind)], item: itemKey)
+                }
+                return newStack
+            case _:
+                print("Unrecognized last stack value in stack \(stack) for .NameBinder")
                 break
             }
         case _:
@@ -122,12 +191,12 @@ func iterate(stack: Stack, item: Item) -> Stack {
 }
 
 func run(stack: Stack, items: [Item]) -> Stack {
-    print("STACK: \(stack)")
+    // print("STACK: \(stack)")
     if items.count == 0 {
         return stack
     }
     let item = items[0]
-    print("ITEM: \(item)")
+    // print("\(item)")
     let newStack = iterate(stack: stack, item: item)
     return run(stack: newStack, items: Array(items.dropFirst()))
 }
@@ -136,10 +205,15 @@ func run(stack: Stack, items: [Item]) -> Stack {
 let stack = [Item]()
            
 let items: [Item] = [
-    Item.from(":name")!,
-    Item.from("Something")!,
+    // Item.from(":name")!,
+    // Item.from("Something")!,
     Item.from(":age")!,
     Item.from("Really old")!,
+    Item.from("as")!,
+    Item.from("both")!,
+    Item.from(":person")!,
+    Item.from("and")!,
+    Item.from(":lol")!,
 ]
 
 let finalStack = run(stack: stack, items: items)
@@ -170,9 +244,9 @@ key:
 dict:
     void - dict - dict
 as:
-    void - Any - name-binder
-name:
-    binder - void - key - bound
+    void - Any - namebinder
+namebinder:
+    void - key - bound
 both:
     void - list - bound
 and:
