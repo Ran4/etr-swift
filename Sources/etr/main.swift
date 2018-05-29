@@ -182,13 +182,12 @@ var stack = [Token]()
 //     ].map { Token.from($0)! }
 // let finalStack = run(stack: stack, tokens: tokens)
 
-func runCli() {
-    print("commandline arguments: \(CommandLine.arguments)")
-    
-    func printHelp() {
-        print("HELP GOES HERE")
-    }
 
+func printHelp() {
+    print("HELP GOES HERE")
+}
+
+func runCli() {
     while true {
         print("> ", terminator: "")
         if let line = readLine() {
