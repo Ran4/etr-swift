@@ -19,17 +19,21 @@ indirect enum Token: CustomStringConvertible {
     case As
     case Both
     case And
+    case Pop
+    case Dup
     case NameBinder(Token)
     case Bound(String, Token)
     
     static func from(_ inputValue: String) -> Token? {
-        switch inputValue {
+        switch inputValue.lowercased() {
         case _ where inputValue.hasPrefix(":"): return .Key(inputValue)
         case _ where inputValue.hasPrefix("\"") && inputValue.hasSuffix("\""):
             return .TokenString(String(inputValue.dropFirst().dropLast()))
         case "as": return .As
         case "both": return .Both
         case "and": return .And
+        case "pop": return .Pop
+        case "dup": return .Dup
         case _: return nil
         }
     }
@@ -51,6 +55,8 @@ indirect enum Token: CustomStringConvertible {
         case .As: return "(as)"
         case .Both: return "(both)"
         case .And: return "(and)"
+        case .Pop: return "(pop)"
+        case .Dup: return "(dup)"
         case let .NameBinder(token): return "(namebinder \(token))"
         case let .Bound(key, token): return "(bound \(key) \(token))"
         }
@@ -58,6 +64,10 @@ indirect enum Token: CustomStringConvertible {
 }
 
 typealias Stack = [Token]
+
+func stackDescription(_ stack: Stack) -> String {
+    return "[ \(stack.map{$0.description}.joined(separator: " ")) ]"
+}
     
 func evaluate(stack: Stack, token: Token) -> Stack {
     print("EVAL [ \(stack.map{$0.description}.joined(separator: " ")) ] \(token)")
@@ -68,13 +78,24 @@ func evaluate(stack: Stack, token: Token) -> Stack {
         } else {
             print("WANING: 'As' statement with empty stack. Does nothing.")
         }
-    case .Both:
-        return stack + [.Both]
-    case .And:
-        return stack + [.And]
+    case .Both: return stack + [.Both]
+    case .And: return stack + [.And]
+    case .Pop:
+        if stack.last == nil {
+            print("WARNING: Stack Underflow. 'pop' on empty stack")
+            return stack
+        } else {
+            return Array(stack.dropLast())
+        }
+    case .Dup:
+        if let lastToken = stack.last {
+            return stack + [lastToken]
+        } else {
+            print("WARNING: Stack Underflow. 'dup' on empty stack")
+            return stack
+        }
     case _:
         break
-    // case 
     }
     
     if let currentStackToken = stack.last {
@@ -162,6 +183,8 @@ var stack = [Token]()
 // let finalStack = run(stack: stack, tokens: tokens)
 
 func runCli() {
+    print("commandline arguments: \(CommandLine.arguments)")
+    
     func printHelp() {
         print("HELP GOES HERE")
     }
@@ -179,7 +202,7 @@ func runCli() {
             }
             
             stack = evaluate(stack: stack, token: token)
-            print("-> \(stack)")
+            print("-> \(stackDescription(stack))")
         } else {
             print("Couldn't read line, quitting...")
             break
@@ -187,7 +210,18 @@ func runCli() {
     }
 }
 
-runCli()
+if CommandLine.argc <= 1  {
+    runCli()
+} else {
+    for rawToken in Array(CommandLine.arguments[1...]) {
+        guard let token = Token.from(rawToken) else {
+            print("Invalid token `\(rawToken)`")
+            continue
+        }
+        stack = evaluate(stack: stack, token: token)
+        print("-> \(stackDescription(stack))")
+    }
+}
 
 /// TODO: implement using [ETR definitions](etr_abnf_definitions.abnf)
 let rawEtcLines: String = """
