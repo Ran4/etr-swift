@@ -10,49 +10,6 @@ func snd<A, B>(_ ab: (A, B)) -> B {
     return b
 }
 
-struct Ets {
-    let name: String
-    let before: [String]
-    let takes: [String]
-    let becomes: [String]
-    
-    init(_ name: String, _ before: [String], _ takes: [String], _ becomes: [String]) {
-        self.name = name
-        self.before = before
-        self.takes = takes
-        self.becomes = becomes
-    }
-    
-    static func from(rawLine: String) -> Ets? { // {{{
-        let splitted = rawLine.split(separator: "-").map({String($0)})
-        if splitted.count != 4 {
-            print("Found \(splitted.count) values after splitting \(rawLine)" +
-                  "into \(splitted), expected 4")
-            return nil
-        }
-        
-        let (rawName, rawBefore, rawTakes, rawBecomes) =
-            (splitted[0], splitted[1], splitted[2], splitted[3])
-        
-        func list_from_string(_ s: String) -> [String] {
-            let s = s.trimmingCharacters(in: .whitespaces)
-            return s.split(separator: " ").map({String($0)})
-        }
-        
-        return Ets(rawName.trimmingCharacters(in: .whitespaces),
-                   list_from_string(rawBefore),
-                   list_from_string(rawTakes),
-                   list_from_string(rawBecomes))
-    }
-    
-    static func from(rawLines: String) -> [Ets] {
-        return rawLines.split(separator: "\n").map {
-            Ets.from(rawLine: String($0))!
-        }
-    }// }}}
-}
-
-
 indirect enum Item: CustomStringConvertible {
     case Key(String)
     case ItemDict(dict: Dictionary<String, Item>)
@@ -66,40 +23,36 @@ indirect enum Item: CustomStringConvertible {
     case Bound(String, Item)
     
     static func from(_ inputValue: String) -> Item? {
-        if inputValue.hasPrefix(":") {
-            return .Key(inputValue)
-        } else {
-            if inputValue == "as" {
-                return .As
-            } else if inputValue == "both" {
-                return .Both
-            } else if inputValue == "and" {
-                return .And
-            } else {
-                return .ItemString(inputValue)
-            }
+        switch inputValue {
+        case _ where inputValue.hasPrefix(":"): return .Key(inputValue)
+        case _ where inputValue.hasPrefix("\"") && inputValue.hasSuffix("\""):
+            return .ItemString(String(inputValue.dropFirst().dropLast()))
+        case "as": return .As
+        case "both": return .Both
+        case "and": return .And
+        case _: return nil
         }
     }
     
     var description: String {
         switch self {
-            case let .Key(s): return s
-            case let .ItemInt(i): return String(i)
-            case let .ItemDict(d):
-                var dictRepresentations: [String] = []
-                for (key, value) in d {
-                    dictRepresentations.append("\(key) \(value)")
-                }
-                return "(dict \(dictRepresentations.joined(separator: " ")))"
-            case let .List(items):
-                let itemDescriptions = items.map {item in item.description }.joined(separator: " ")
-                return "(list \(itemDescriptions))"
-            case let .ItemString(s): return "\"" + s + "\""
-            case .As: return "(as)"
-            case .Both: return "(both)"
-            case .And: return "(and)"
-            case let .NameBinder(item): return "(namebinder \(item))"
-            case let .Bound(key, item): return "(bound \(key) \(item))"
+        case let .Key(s): return s
+        case let .ItemInt(i): return String(i)
+        case let .ItemDict(d):
+            var dictRepresentations: [String] = []
+            for (key, value) in d {
+                dictRepresentations.append("\(key) \(value)")
+            }
+            return "(dict \(dictRepresentations.joined(separator: " ")))"
+        case let .List(items):
+            let itemDescriptions = items.map {item in item.description }.joined(separator: " ")
+            return "(list \(itemDescriptions))"
+        case let .ItemString(s): return "\"" + s + "\""
+        case .As: return "(as)"
+        case .Both: return "(both)"
+        case .And: return "(and)"
+        case let .NameBinder(item): return "(namebinder \(item))"
+        case let .Bound(key, item): return "(bound \(key) \(item))"
         }
     }
 }
@@ -151,7 +104,6 @@ func iterate(stack: Stack, item: Item) -> Stack {
                 let newItem = Item.ItemDict(dict: [s: item])
                 return stack.dropLast() + [newItem]
             }
-            
         case let .ItemDict(d1):
             switch item {
             case let .ItemDict(d2):
@@ -170,9 +122,8 @@ func iterate(stack: Stack, item: Item) -> Stack {
             case let .Key(s):
                 return stack.dropLast() + [.Bound(s, itemToBind)]
             case let .List(itemKeys):
-                //TODO: fix this
-                print("cool, got list of itemKeys \(itemKeys)")
-                var newStack: [Item] = Array(stack)
+                // Bind every item in the list
+                var newStack: [Item] = Array(stack.dropLast())
                 for itemKey in itemKeys {
                     newStack = iterate(stack: newStack + [.NameBinder(itemToBind)], item: itemKey)
                 }
@@ -193,51 +144,53 @@ func iterate(stack: Stack, item: Item) -> Stack {
 func run(stack: Stack, items: [Item]) -> Stack {
     // print("STACK: \(stack)")
     if items.count == 0 {
+        print("-> \(stack)")
         return stack
     }
     let item = items[0]
-    // print("\(item)")
+    print("-> \(stack)")
     let newStack = iterate(stack: stack, item: item)
     return run(stack: newStack, items: Array(items.dropFirst()))
 }
 
+var stack = [Item]()
 
-let stack = [Item]()
-           
-let items: [Item] = [
-    // Item.from(":name")!,
-    // Item.from("Something")!,
-    Item.from(":age")!,
-    Item.from("Really old")!,
-    Item.from("as")!,
-    Item.from("both")!,
-    Item.from(":person")!,
-    Item.from("and")!,
-    Item.from(":lol")!,
-]
+// var items: [Item] =
+//     [
+//         ":age", "\"Really old\"", "as", "both", ":person", "and", ":oldPerson",
+//     ].map { Item.from($0)! }
+// let finalStack = run(stack: stack, items: items)
 
-let finalStack = run(stack: stack, items: items)
+func runCli() {
+    func printHelp() {
+        print("HELP GOES HERE")
+    }
 
-// stack = iterate(stack: stack, item: item)
+    while true {
+        print("> ", terminator: "")
+        if let line = readLine() {
+            guard let item = Item.from(line) else {
+                if line == "help" {
+                    printHelp()
+                } else {
+                    print("Invalid item `\(line)`")
+                }
+                continue
+            }
+            
+            stack = iterate(stack: stack, item: item)
+            print("-> \(stack)")
+        } else {
+            print("Couldn't read line, quitting...")
+            break
+        }
+    }
+}
 
-// item = 
-// print("STACK: \(stack)\nITEM: \(item)\n")
+runCli()
 
-
-let rawEtcLines: String = """
-    key - dict - Any - dict
-    key - void - Any - dict
-    dict - void - dict - dict
-    as - void - Any - namebinder
-    namebinder - void - key - bound
-    both - void - list - bound
-    and - void - key - list
-    , - key - key - void
-    , - list - key - void
-    """
-    
 /// TODO: implement using [ETR definitions](etr_abnf_definitions.abnf)
-let rawEtcLines2: String = """
+let rawEtcLines: String = """
 key:
     dict - Any - dict
     void - Any - dict
@@ -256,11 +209,3 @@ and:
 ,:
     list - key - void
 """
-    
-var etss = Ets.from(rawLines: rawEtcLines)
-var etsDict = [String: Ets]()
-for ets in etss {
-    etsDict[ets.name] = ets
-}
-
-// print(etsDict)
