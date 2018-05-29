@@ -59,7 +59,7 @@ indirect enum Token: CustomStringConvertible {
 
 typealias Stack = [Token]
     
-func iterate(stack: Stack, token: Token) -> Stack {
+func evaluate(stack: Stack, token: Token) -> Stack {
     print("EVAL [ \(stack.map{$0.description}.joined(separator: " ")) ] \(token)")
     switch token {
     case .As:
@@ -81,14 +81,14 @@ func iterate(stack: Stack, token: Token) -> Stack {
         switch currentStackToken {
         case .And:
             if case let prevToken? = stack.dropLast().last {
-                return iterate(stack: Array(stack.dropLast(2)), token: .List([prevToken, token]))
+                return evaluate(stack: Array(stack.dropLast(2)), token: .List([prevToken, token]))
             } else {
                 print("WANING: 'And' statement with empty stack. Does nothing.")
             }
         case .Both:
             if case .List = token { // fall-through
                 print("'Both' got list, falling through")
-                return iterate(stack: Array(stack.dropLast()), token: token)
+                return evaluate(stack: Array(stack.dropLast()), token: token)
             } else {
                 break
             }
@@ -125,7 +125,7 @@ func iterate(stack: Stack, token: Token) -> Stack {
                 // Bind every token in the list
                 var newStack: [Token] = Array(stack.dropLast())
                 for tokenKey in tokenKeys {
-                    newStack = iterate(stack: newStack + [.NameBinder(tokenToBind)], token: tokenKey)
+                    newStack = evaluate(stack: newStack + [.NameBinder(tokenToBind)], token: tokenKey)
                 }
                 return newStack
             case _:
@@ -149,7 +149,7 @@ func run(stack: Stack, tokens: [Token]) -> Stack {
     }
     let token = tokens[0]
     print("-> \(stack)")
-    let newStack = iterate(stack: stack, token: token)
+    let newStack = evaluate(stack: stack, token: token)
     return run(stack: newStack, tokens: Array(tokens.dropFirst()))
 }
 
@@ -178,7 +178,7 @@ func runCli() {
                 continue
             }
             
-            stack = iterate(stack: stack, token: token)
+            stack = evaluate(stack: stack, token: token)
             print("-> \(stack)")
         } else {
             print("Couldn't read line, quitting...")
