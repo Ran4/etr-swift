@@ -182,6 +182,17 @@ var stack = [Token]()
 //     ].map { Token.from($0)! }
 // let finalStack = run(stack: stack, tokens: tokens)
 
+func parseAndEvaluate(stack: inout Stack, rawToken: String) {
+     guard let token = Token.from(rawToken) else {
+        if rawToken == "help" {
+            printHelp()
+        } else {
+            print("Invalid token `\(rawToken)`")
+        }
+        return
+    }
+    stack = evaluate(stack: stack, token: token)
+}
 
 func printHelp() {
     print("HELP GOES HERE")
@@ -190,22 +201,13 @@ func printHelp() {
 func runCli() {
     while true {
         print("> ", terminator: "")
-        if let line = readLine() {
-            guard let token = Token.from(line) else {
-                if line == "help" {
-                    printHelp()
-                } else {
-                    print("Invalid token `\(line)`")
-                }
-                continue
-            }
-            
-            stack = evaluate(stack: stack, token: token)
-            print("-> \(stackDescription(stack))")
-        } else {
+        
+        guard let line = readLine() else {
             print("Couldn't read line, quitting...")
             break
         }
+        parseAndEvaluate(stack: &stack, rawToken: line)
+        print("-> \(stackDescription(stack))")
     }
 }
 
@@ -213,11 +215,7 @@ if CommandLine.argc <= 1  {
     runCli()
 } else {
     for rawToken in Array(CommandLine.arguments[1...]) {
-        guard let token = Token.from(rawToken) else {
-            print("Invalid token `\(rawToken)`")
-            continue
-        }
-        stack = evaluate(stack: stack, token: token)
+        parseAndEvaluate(stack: &stack, rawToken: rawToken)
         print("-> \(stackDescription(stack))")
     }
 }
